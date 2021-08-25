@@ -1,6 +1,7 @@
 #include <iostream>
 #include <stack>
 #include <map>
+#include <vector>
 
 using namespace std;
 
@@ -132,9 +133,9 @@ int evaluateExpression(string expression)
 
 void testEvaluation()
 {
-  string input[7] = {"1 + 2", "-1 + 3", "-1", "3(2*4)", "(4 + 5 * (7 - 3)) - 2", "4+5+7/2", "22-3"};
+  vector<string> input = {"1 + 2", "-1 + 3", "-1", "3(2*4)", "(4 + 5 * (7 - 3)) - 2", "4+5+7/2", "22-3"};
 
-  for (int i = 0; i < 7; i++)
+  for (int i = 0; i < input.size(); i++)
   {
     cout << input[i] << " correctly produces ";
     try
@@ -152,6 +153,8 @@ int main()
 {
   testEvaluation();
   string expression;
+
+  cout << "Input expression: " << endl;
   while (getline(cin, expression))
   {
     try
