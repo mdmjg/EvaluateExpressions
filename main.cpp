@@ -1,134 +1,279 @@
 #include <iostream>
-#include <stack>
-#include <map>
+#include <string>
 #include <vector>
 
 using namespace std;
-
-map<char, int> precedence = {{'-', 1}, {'+', 1}, {'*', 2}, {'/', 2}, {'(', 0}, {')', 0}};
-
-int processOperatorsandValues(stack<int> &numbers, stack<char> &operators)
+enum NodeType
 {
-  if (numbers.size() < 2)
+  MULT = '*',
+  DIV = '/',
+  ADD = '+',
+  SUB = '-',
+  INT = 'I',
+  LPARENTHESIS = '(',
+  RPARENTHESIS = ')',
+  DONE = '0'
+};
+class Node
+{
+public:
+  NodeType type;
+  int value;
+  Node *left;
+  Node *right;
+  Node(NodeType type)
   {
-    throw "Invalid operation";
+    this->type = type;
+  }
+  Node(NodeType type, int v)
+  {
+    this->type = type;
+    this->value = v;
+  }
+};
+class Tokenizer
+{
+public:
+  string expression;
+  int current;
+  char currentChar;
+
+  Tokenizer(string expression)
+  {
+    this->expression = expression;
+    this->current = 0;
+    currentChar = expression[0];
   }
 
-  char currentOperator = operators.top();
-  operators.pop();
-
-  int value2 = numbers.top();
-  numbers.pop();
-
-  int value1 = numbers.top();
-  numbers.pop();
-
-  if (currentOperator == '*')
+  void getNextChar()
   {
-    return value1 * value2;
+    if (current < expression.size() - 1)
+    {
+      current++;
+      currentChar = expression[current];
+    }
+    else
+    {
+      currentChar = '\0';
+    }
   }
-  else if (currentOperator == '/')
+
+  Node *getNextToken()
   {
-    return value1 / value2;
+    Node *node;
+    while (isspace(currentChar))
+    {
+      getNextChar();
+    }
+
+    if (isdigit(currentChar))
+    {
+      char token = currentChar;
+      getNextChar();
+
+      // check that digit is single digit
+      if (isdigit(currentChar))
+      {
+        throw "Integer too large";
+      }
+      if (currentChar == '(')
+      {
+        throw "Invalid Input"; //ex: 3(2+4)
+      }
+
+      int value = token - '0';
+      node = new Node(INT, value);
+    }
+
+    else if (currentChar == '+')
+    {
+      node = new Node(ADD);
+      getNextChar();
+    }
+
+    else if (currentChar == '-')
+    {
+      node = new Node(SUB);
+      getNextChar();
+    }
+    else if (currentChar == '*')
+    {
+      node = new Node(MULT);
+      getNextChar();
+    }
+    else if (currentChar == '/')
+    {
+      node = new Node(DIV);
+      getNextChar();
+    }
+    else if (currentChar == '(')
+    {
+      node = new Node(LPARENTHESIS);
+      getNextChar();
+    }
+    else if (currentChar == ')')
+    {
+      node = new Node(RPARENTHESIS);
+      getNextChar();
+    }
+    else if (currentChar == '\0')
+    {
+      node = new Node(DONE);
+    }
+    else
+    {
+      throw "Invalid operand";
+    }
+
+    return node;
   }
-  else if (currentOperator == '+')
+};
+
+class Parser
+{
+public:
+  Tokenizer *tokenizer;
+  Node *currentNode;
+  Node *root;
+
+  Parser(Tokenizer *tokenizer)
   {
-    return value1 + value2;
+    this->tokenizer = tokenizer;
+    currentNode = (*this->tokenizer).getNextToken();
+    root = currentNode;
   }
-  return value1 - value2;
-}
+
+  Node *buildSubTree(Node *left, Node *operation, Node *right)
+  {
+    operation->left = left;
+    operation->right = right;
+    return operation;
+  }
+
+  void move()
+  {
+    currentNode = (*tokenizer).getNextToken();
+  }
+
+  Node *readMultiplicationandDivision()
+  {
+    Node *node = readIntOrParenthesis();
+
+    while (currentNode->type == MULT || currentNode->type == DIV)
+    {
+      Node *current = currentNode;
+      move();
+      node = buildSubTree(node, current, readIntOrParenthesis());
+    }
+    return node;
+  }
+
+  Node *readIntOrParenthesis()
+  {
+    Node *node = currentNode;
+    if (node->type == INT)
+    {
+      move();
+      return node;
+    }
+
+    else if (node->type == LPARENTHESIS)
+    {
+      move();
+      node = readAdditionandSubtraction();
+      move();
+      return node;
+    }
+    else
+    {
+      throw "Invalid Input";
+    }
+  }
+
+  Node *readAdditionandSubtraction()
+  {
+    Node *node = readMultiplicationandDivision();
+
+    while (currentNode->type == ADD || currentNode->type == SUB)
+    {
+      Node *current = currentNode;
+      move();
+      node = buildSubTree(node, current, readMultiplicationandDivision());
+    }
+    return node;
+  }
+};
+
+class Calculator
+{
+public:
+  int result;
+  Parser *parser;
+  Calculator(Parser *parser)
+  {
+    this->parser = parser;
+  }
+
+  int visit(Node *node)
+  {
+    if (node->type == ADD)
+    {
+      int a = visit(node->left);
+      int b = visit(node->right);
+      result = a + b;
+    }
+    else if (node->type == SUB)
+    {
+      int a = visit(node->left);
+      int b = visit(node->right);
+      result = (visit(node->left) - visit(node->right));
+    }
+    else if (node->type == MULT)
+    {
+      int a = visit(node->left);
+      int b = visit(node->right);
+      result = (a * b);
+    }
+    else if (node->type == DIV)
+    {
+      result = (visit(node->left) / visit(node->right));
+    }
+    else if (node->type == INT)
+    {
+      result = node->value;
+    }
+    else if (node->type == DONE)
+    {
+      result = 0;
+    }
+    else
+    {
+      throw "Invalid Input ";
+    }
+
+    return result;
+  }
+
+  int traverse()
+  {
+    return visit(parser->readAdditionandSubtraction());
+  }
+};
 
 int evaluateExpression(string expression)
 {
-  stack<int> numbers;
-  stack<char> operators;
-  int valueFlag = 0; // determines if our last seen char was a number or not
-
-  for (int i = 0; i < expression.length(); i++)
+  try
   {
-    char current = expression[i];
-    if (current == ' ')
-    {
-      continue;
-    }
+    Tokenizer *token = new Tokenizer(expression);
+    Parser *parser = new Parser(token);
 
-    if (isdigit(current))
-    {
-      if (valueFlag == 1) // detects if literal is too large
-      {
-        throw "Literal too large";
-      }
-      valueFlag = 1;
-      numbers.push(current - 48);
-    }
-    else if (current == ')')
-    {
-      valueFlag = 0;
-
-      while (!operators.empty() && operators.top() != '(')
-      {
-        try
-        {
-          int result = processOperatorsandValues(numbers, operators);
-          numbers.push(result);
-        }
-        catch (char const *e)
-        {
-          throw e;
-        }
-      }
-      if (!operators.empty())
-      {
-        operators.pop();
-      }
-    }
-    else if (current == '(')
-    {
-      valueFlag = 0;
-      operators.push(current);
-    }
-    else if (precedence.find(current) != precedence.end())
-    {
-      valueFlag = 0;
-      while (!operators.empty() && precedence[operators.top()] >= precedence[current])
-      {
-        try
-        {
-          int result = processOperatorsandValues(numbers, operators);
-          numbers.push(result);
-        }
-        catch (char const *e)
-        {
-          throw e;
-        }
-      }
-      operators.push(current);
-    }
-
-    else
-    {
-      throw "Invalid operation!";
-    }
+    Calculator *calculator = new Calculator(parser);
+    return (*calculator).traverse();
   }
-
-  while (!operators.empty())
+  catch (char const *e)
   {
-    try
-    {
-      int result = processOperatorsandValues(numbers, operators);
-      numbers.push(result);
-    }
-    catch (char const *e)
-    {
-      throw e;
-    }
+    throw "Invalid Input";
   }
-
-  if (numbers.size() > 1)
-  {
-    throw "Invalid Operation";
-  }
-  return numbers.top();
 }
 
 void testEvaluation()
@@ -155,6 +300,7 @@ int main()
   string expression;
 
   cout << "Input expression: " << endl;
+
   while (getline(cin, expression))
   {
     try
